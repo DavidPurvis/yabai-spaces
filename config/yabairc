@@ -1,0 +1,26 @@
+#!/usr/bin/env sh
+set -eu
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+YABAI=${YABAI_BIN:-$(command -v yabai)}
+
+# BSP layout and mouse-focus preferences.
+"$YABAI" -m config layout bsp
+"$YABAI" -m config auto_balance off
+"$YABAI" -m config split_ratio 0.50
+"$YABAI" -m config window_placement second_child
+"$YABAI" -m config focus_follows_mouse autofocus
+"$YABAI" -m config mouse_follows_focus on
+
+# Labels replace these entries when this file is loaded again.
+"$YABAI" -m rule --add label=utility-float \
+    app='^(System Settings|App Store|Music|System Information|Disk Utility|Calculator|Messages|Finder)$' \
+    manage=off
+
+# Supported event: center newly created floating windows or arrange tiled ones.
+"$YABAI" -m signal --add label=spiral-created event=window_created \
+    action='"$HOME/.config/yabai/spiral.sh"'
+
+# Restart after Dock restarts; this does not load a scripting addition.
+"$YABAI" -m signal --add label=dock-restart event=dock_did_restart \
+    action='PATH="/opt/homebrew/bin:/usr/local/bin:$PATH" "${YABAI_BIN:-yabai}" --restart-service'

@@ -1,0 +1,8 @@
+# Open a new window in the existing application instance.
+alt - return : /usr/bin/osascript -e 'tell application "Terminal"' -e 'do script ""' -e 'activate' -e 'end tell'
+alt - f : /usr/bin/osascript -e 'tell application "Finder"' -e 'make new Finder window to (path to home folder)' -e 'activate' -e 'end tell'
+alt - v : /usr/bin/open -na 'Visual Studio Code' --args --new-window
+alt - s : /usr/bin/osascript -e 'tell application "Safari"' -e 'make new document' -e 'activate' -e 'end tell'
+
+# Center when entering floating mode; returning to tiling needs no grid command.
+alt + cmd - f : "$HOME/.config/yabai/toggle-float.sh"
