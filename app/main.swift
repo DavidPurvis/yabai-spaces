@@ -387,9 +387,14 @@ if arguments == ["--snapshot"] {
 }
 
 if arguments == ["--self-test"] {
-    let spaces = (1...4).map { SpaceInfo(id: UInt64($0), index: $0, display: 1,
-                                       fullscreen: $0 == 4, focused: $0 == 2, visible: $0 == 2,
-                                       apps: $0 == 1 ? ["Terminal": 2] : [:]) }
+    var spaces: [SpaceInfo] = []
+    for index in 1...4 {
+        let apps: [String: Int] = index == 1 ? ["Terminal": 2] : [:]
+        let space = SpaceInfo(id: UInt64(index), index: index, display: 1,
+                              fullscreen: index == 4, focused: index == 2,
+                              visible: index == 2, apps: apps)
+        spaces.append(space)
+    }
     precondition(symbolName(spaces[0]) == "1.square")
     precondition(symbolName(spaces[1]) == "2.square.fill")
     let fixture = Snapshot(source: "test", spaces: spaces, note: nil)
