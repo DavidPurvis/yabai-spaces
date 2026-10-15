@@ -1,6 +1,6 @@
 # Yabai Spaces reference
 
-This guide describes the configuration shipped with Yabai Spaces 1.0.0, not every upstream yabai/skhd default. The menu-bar app can be installed independently; shortcuts and window-management settings apply only when the optional configuration is installed.
+This guide describes Yabai Spaces 1.1.0 and its optional configuration, not every upstream yabai/skhd default. The hover-focus menu toggle works with any running yabai instance. Shortcuts and the other window-management settings apply only when the optional configuration is installed.
 
 ## Quick memory jog
 
@@ -20,7 +20,11 @@ This guide describes the configuration shipped with Yabai Spaces 1.0.0, not ever
 
 Every existing Space gets a numbered square. Filled means focused, bright outlined means visible on another display, and dim outlined means inactive. The menu lists desktop/fullscreen counts and apps grouped by Space, with app icons and window counts in submenus. Native fullscreen Spaces are included and labelled. Hover for the desktop count and focused number.
 
-**Refresh** requests new data. **Open reference guide** opens this bundled document. **Quit** hides the app until the next login or manual start. The menu is informational; it does not switch Spaces or move windows.
+**Focus on hover: Enabled/Disabled** shows yabai's current setting. Click to switch it immediately. Enabling uses `autofocus`; an existing `autoraise` setting also appears enabled and can be disabled. The item is disabled while updating or when yabai cannot be reached, in which case it reads **Focus on hover: Unavailable**. Failed changes show an error and are not saved as successful.
+
+Your first successful menu selection is saved in the app's preferences (`focusOnHoverEnabled` in `local.davidpurvis.yabaispaces`). While Yabai Spaces is running, it restores that selection after the app or yabai restarts or reconnects. Until your first selection, it follows the existing yabai configuration. External runtime changes are reflected in the menu without being repeatedly overwritten; they do not replace your saved menu choice. Restoration does not edit `.yabairc`, require skhd, or restart yabai. Quitting Yabai Spaces leaves the current setting in effect but pauses restoration until the app runs again.
+
+**Refresh** requests new data. **Open reference guide** opens this bundled document. **Quit** hides the app until the next login or manual start. The desktop overview does not switch Spaces or move windows.
 
 Space, app, screen, and wake events trigger refreshes; a five-second timer covers other changes. Opening the menu uses the last completed snapshot and requests another refresh. Desktop numbers follow Mission Control order and can change if you reorder Spaces.
 
@@ -34,7 +38,7 @@ These are all six settings explicitly set in `config/yabairc`:
 | `auto_balance` | `off` | Keep unequal nested sizes instead of automatically balancing |
 | `split_ratio` | `0.50` | Start new splits at 50/50; not all windows get equal area |
 | `window_placement` | `second_child` | Initial placement before spiral correction |
-| `focus_follows_mouse` | `autofocus` | Focus windows under the pointer |
+| `focus_follows_mouse` | `autofocus` | Sample configuration default; the menu shows and changes the live setting and restores a saved choice after restart |
 | `mouse_follows_focus` | `on` | Move the pointer to a newly focused window |
 
 Gaps, padding, opacity, shadows, animations, mouse-drag actions, and other options are not explicitly configured. The sample configuration stops on command errors (`set -eu`); inspect the service logs if it loads only partially.
@@ -98,7 +102,7 @@ launchctl print "gui/$(id -u)/local.davidpurvis.yabaispaces"
 cat "$HOME/Library/Caches/local.davidpurvis.yabaispaces/status.json"
 ```
 
-The diagnostic timestamp records the last changed snapshot, not a heartbeat. It contains source, indices, focus, image width, and status-item visibility; not app names or window titles. An on-demand `--snapshot` includes app names/counts, so review it before sharing publicly.
+The diagnostic timestamp records the last changed snapshot or hover-focus state, not a heartbeat. It contains source, indices, focus, image width, status-item visibility, and the hover-focus mode/title/error; not app names or window titles. An on-demand `--snapshot` includes app names/counts, so review it before sharing publicly.
 
 | Edited item | Apply it |
 |---|---|
@@ -108,7 +112,7 @@ The diagnostic timestamp records the last changed snapshot, not a heartbeat. It 
 | Native app | Rebuild, then reinstall with `--replace` |
 | Separate Spaces preference | Log out/in after saving work |
 
-Common adjustments: disable hover focus with `focus_follows_mouse off`; disable pointer movement with `mouse_follows_focus off`; enable equal-area rebalancing with `auto_balance on`; add exact app names to `utility-float` to float them. Avoid duplicate shortcut definitions. Version 0.3.9 of skhd keeps the first duplicate binding.
+Common adjustments: use the menu to toggle hover focus; disable pointer movement with `mouse_follows_focus off`; enable equal-area rebalancing with `auto_balance on`; add exact app names to `utility-float` to float them. Avoid duplicate shortcut definitions. Version 0.3.9 of skhd keeps the first duplicate binding.
 
 ## Troubleshooting
 

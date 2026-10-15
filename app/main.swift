@@ -3,7 +3,7 @@ import CoreGraphics
 import Darwin
 
 // A native menu-bar companion, inspired by AeroSpace's i3Ordered style.
-// No window management, global shortcuts, or Space-changing private API calls.
+// Desktop overview and an explicit hover-focus setting; no Space-changing calls.
 struct SpaceInfo: Codable, Equatable {
     let id: UInt64
     let index: Int
@@ -36,10 +36,14 @@ func yabaiExecutable() -> String? {
 
 func command(_ arguments: [String]) throws -> Data {
     guard let binary = yabaiExecutable() else { throw ReadError.unavailable }
+    return try runProcess(binary, ["-m"] + arguments)
+}
+
+func runProcess(_ binary: String, _ arguments: [String]) throws -> Data {
     let task = Process()
     let output = Pipe()
     task.executableURL = URL(fileURLWithPath: binary)
-    task.arguments = ["-m"] + arguments
+    task.arguments = arguments
     task.standardOutput = output
     task.standardError = FileHandle.nullDevice
     // Drain stdout while the process runs; bound unresponsive daemons to 3 seconds.
@@ -215,6 +219,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var item: NSStatusItem!
     private var timer: Timer?
     private var busy = false
+    private var changingHover = false
+    private let worker = DispatchQueue(label: "local.davidpurvis.yabaispaces.worker", qos: .utility)
+    private let hover = HoverFocusController()
+    private var hoverStatus = HoverStatus(mode: nil, error: nil)
+    private var hoverItem: NSMenuItem?
+    private var hoverErrorItem: NSMenuItem?
     private var snapshot = Snapshot(source: "loading", spaces: [], note: nil)
     private let menu = NSMenu()
 
@@ -224,6 +234,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item.button?.title = "…"
         item.button?.setAccessibilityLabel("Yabai Spaces")
         item.menu = menu
+        menu.autoenablesItems = false
         menu.delegate = self
         let center = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.activeSpaceDidChangeNotification, NSWorkspace.didActivateApplicationNotification,
@@ -234,14 +245,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         NotificationCenter.default.addObserver(self, selector: #selector(refresh),
                                                name: NSApplication.didChangeScreenParametersNotification, object: nil)
-        timer = Timer.scheduledTimer(timeInterval: 5, target: self, selector: #selector(refresh), userInfo: nil, repeats: true)
+        timer = Timer(timeInterval: 5, target: self, selector: #selector(refresh), userInfo: nil, repeats: true)
+        RunLoop.main.add(timer!, forMode: .common)
         refresh()
     }
 
     @objc func refresh() {
-        guard !busy else { return }
+        guard !busy && !changingHover else { return }
         busy = true
-        DispatchQueue.global(qos: .utility).async {
+        worker.async { [self] in
+            let focus = self.hover.refresh()
+            DispatchQueue.main.async {
+                let changed = self.hoverStatus != focus
+                self.hoverStatus = focus
+                self.updateHoverItem()
+                if changed { self.updateIndicator() }
+            }
             let result = readSnapshot()
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
@@ -275,6 +294,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                        "focusedIndices": snapshot.spaces.filter { $0.focused }.map { $0.index },
                                        "statusItemVisible": item.isVisible,
                                        "imageWidth": button.image?.size.width ?? 0,
+                                       "focusOnHover": hoverStatus.mode?.rawValue ?? "unavailable",
+                                       "focusOnHoverTitle": hoverStatus.title,
+                                       "focusOnHoverError": hoverStatus.error ?? "",
                                        "updatedAt": ISO8601DateFormatter().string(from: Date())]
         if let data = try? JSONSerialization.data(withJSONObject: diagnostic, options: [.prettyPrinted, .sortedKeys]) {
             try? data.write(to: cache.appendingPathComponent("status.json"), options: .atomic)
@@ -292,11 +314,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(row)
     }
 
+    private func updateHoverItem() {
+        let model = hoverMenuItem(hoverStatus, changing: changingHover, target: self, action: #selector(toggleHover))
+        hoverItem?.title = model.title
+        hoverItem?.isEnabled = model.isEnabled
+        hoverItem?.state = model.state
+        hoverItem?.toolTip = model.toolTip
+        hoverErrorItem?.isHidden = hoverStatus.error == nil
+        hoverErrorItem?.toolTip = hoverStatus.error
+    }
+
+    @objc private func toggleHover() {
+        guard !changingHover && hoverStatus.mode != nil else { return }
+        changingHover = true
+        updateHoverItem()
+        worker.async { [self] in
+            let result = self.hover.toggle()
+            DispatchQueue.main.async {
+                self.changingHover = false
+                self.hoverStatus = result
+                self.updateHoverItem()
+                self.updateIndicator()
+                if let message = result.error {
+                    let alert = NSAlert()
+                    alert.messageText = "Hover focus could not be changed"
+                    alert.informativeText = message
+                    alert.runModal()
+                }
+                self.refresh()
+            }
+        }
+    }
+
     private func rebuildMenu() {
         menu.removeAllItems()
         let count = "\(snapshot.desktopCount) desktop\(snapshot.desktopCount == 1 ? "" : "s")"
         let full = snapshot.fullscreenCount == 0 ? "" : " · \(snapshot.fullscreenCount) fullscreen"
         heading("Yabai Spaces · " + count + full, to: menu)
+        hoverItem = hoverMenuItem(hoverStatus, changing: changingHover, target: self, action: #selector(toggleHover))
+        menu.addItem(hoverItem!)
+        let errorRow = NSMenuItem(title: "Hover-focus setting needs attention", action: nil, keyEquivalent: "")
+        errorRow.isEnabled = false
+        errorRow.isHidden = hoverStatus.error == nil
+        errorRow.toolTip = hoverStatus.error
+        hoverErrorItem = errorRow
+        menu.addItem(errorRow)
         menu.addItem(.separator())
         var lastDisplay: Int?
         let multipleDisplays = Set(snapshot.spaces.map { $0.display }).count > 1
@@ -355,11 +417,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
 let arguments = Array(CommandLine.arguments.dropFirst())
 let usage = """
-Yabai Spaces 1.0.0
-Usage: YabaiSpaces [--snapshot | --self-test | --render-preview PATH | --help | --version]
+Yabai Spaces 1.1.0
+Usage: YabaiSpaces [--snapshot | --self-test | --test-live-hover | --render-preview PATH | --help | --version]
 Without arguments, starts the native menu-bar indicator.
 --snapshot        Read desktop/app metadata as JSON (no window titles).
 --self-test       Run deterministic checks without querying live desktops.
+--test-live-hover Test both menu toggle directions against yabai; finishes disabled.
 --render-preview  Render live desktop numbers to a PNG (not a screenshot).
 """
 if arguments == ["--help"] {
@@ -367,11 +430,12 @@ if arguments == ["--help"] {
     exit(0)
 }
 if arguments == ["--version"] {
-    print("1.0.0")
+    print("1.1.0")
     exit(0)
 }
 let validArguments = arguments.isEmpty || arguments == ["--snapshot"]
     || arguments == ["--self-test"]
+    || arguments == ["--test-live-hover"]
     || (arguments.count == 2 && arguments.first == "--render-preview")
 if !validArguments {
     fputs(usage + "\nInvalid arguments.\n", stderr)
@@ -387,6 +451,7 @@ if arguments == ["--snapshot"] {
 }
 
 if arguments == ["--self-test"] {
+    try runHoverSelfTests()
     var spaces: [SpaceInfo] = []
     for index in 1...4 {
         let apps: [String: Int] = index == 1 ? ["Terminal": 2] : [:]
@@ -431,6 +496,11 @@ if arguments == ["--self-test"] {
         } catch ReadError.invalidData { }
     }
     print("Passed: symbols, counts, geometry, template rendering, JSON round-trip, multi-display membership, title exclusion, invalid data.")
+    exit(0)
+}
+
+if arguments == ["--test-live-hover"] {
+    try runLiveHoverTest()
     exit(0)
 }
 

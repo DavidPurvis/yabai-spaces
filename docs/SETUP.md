@@ -71,6 +71,18 @@ Restarting yabai can rearrange windows. Helper-only edits are read on the next i
 
 The login agent label is kept stable for upgrades from the original local prototype. It has `RunAtLoad` but no `KeepAlive`, so **Quit** works for the rest of the current login session.
 
+## Remembered hover-focus choice
+
+The app leaves hover focus as configured until you first use its **Focus on hover** toggle. Successful selections are stored in the macOS preferences domain `local.davidpurvis.yabaispaces`, key `focusOnHoverEnabled`. With the app running, that choice is restored after app/daemon restarts or reconnection, usually within the five-second refresh interval after yabai finishes starting. Live changes from other tools still appear in the menu; only menu selections update the remembered choice.
+
+To return to following your yabai configuration, quit Yabai Spaces, remove only this preference, then reopen the app:
+
+```sh
+defaults delete local.davidpurvis.yabaispaces focusOnHoverEnabled
+```
+
+Removing the preference does not change the current live setting; your configuration takes over on the next yabai restart. This preference is separate from configuration backups and survives app upgrades.
+
 ## Update
 
 ```sh

@@ -21,13 +21,17 @@ The fallback resolves `SLSMainConnectionID`, `SLSCopyManagedDisplaySpaces`, `SLS
 
 Queries run off the main thread. Only one refresh runs at a time. The UI redraws on changed snapshots. A hung yabai process gets a termination request after two seconds and a forced stop after three; stdout is drained while it runs and stderr is discarded to avoid filling an unread pipe. Commands are launched as argument arrays, not interpolated shell strings.
 
+Hover-focus reads/writes and desktop refreshes share a serial worker queue. The menu item updates in place, including during menu tracking, and writes are confirmed by reading back the live setting before saving a Boolean preference. `off`/`disabled` are disabled; `autofocus`/`autoraise` are enabled. Enabling explicitly selects `autofocus`.
+
+The hover controller tracks reachability and the identity of the current user's yabai IPC socket (inode and creation time). A new connection or replaced socket restores an existing saved preference, with retries after failed restoration. This avoids confusing temporary `yabai -m` clients with daemon restarts. It does not continually enforce that preference against external changes on an unchanged connection. The preference is absent until the first successful menu selection; configuration files are never rewritten. `--snapshot` retains its existing desktop-only JSON shape.
+
 The indicator is a template image: 20-point numbered squares with three-point gaps and 50% opacity for inactive Spaces. For numbers without a system symbol, a rounded rectangle and numeral are drawn. The app has no Dock icon and does not reserve screen space.
 
 ## Privacy
 
 There are no network calls or analytics in the app/helper. The yabai JSON response can include window titles, but this app does not use, persist, or display them. The native path similarly uses only app/window membership metadata, not titles or images. No screen images are captured and the app does not request Screen Recording.
 
-The local status file contains only indices, focused indices, source, visibility, width, and last-change time. `--snapshot` prints app names/counts and Space identifiers; inspect that output before posting it. Runtime state, build products, logs, and machine-specific audit reports are excluded from this repository.
+The local status file contains indices, focused indices, source, visibility, width, last-change time, and hover-focus mode/title/error. `--snapshot` prints app names/counts and Space identifiers; inspect that output before posting it. Runtime state, build products, logs, and machine-specific audit reports are excluded from this repository.
 
 ## Build and test
 
@@ -39,6 +43,10 @@ codesign --verify --strict build/YabaiSpaces.app
 ```
 
 Helper tests simulate yabai and cover directional placement/correction, independent Spaces, eligibility, floating geometry, duplicates, failed moves, and JSON/daemon errors. Installer tests use isolated temporary homes, not real dotfiles, and check generated plists, overwrite refusal, backups, symlinks, alternate configs, and rollback. Native self-tests cover model decoding, counts, symbols, geometry, and snapshot round-trips.
+
+Native hover tests exercise actual AppKit menu actions against an injected daemon, including saved-state restoration, restart/reconnect detection, external changes, unavailable states, and failed writes/readbacks. They require access to a macOS WindowServer session but never change live desktop settings or real preferences.
+
+For an explicit live smoke test, start with hover focus disabled and run `build/YabaiSpaces.app/Contents/MacOS/YabaiSpaces --test-live-hover`. It invokes both AppKit menu actions against real yabai and saves Disabled afterward; it is intentionally excluded from CI and normal `--self-test`.
 
 The build targets macOS 13+ on the host architecture, bundles the offline reference, and applies a local ad-hoc signature. It is not a notarized or universal release binary. CI builds on macOS without installing the app or changing desktop settings.
 

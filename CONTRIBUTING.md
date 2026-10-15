@@ -1,6 +1,6 @@
 # Contributing
 
-Keep the app small, native, and read-only. Changes to the optional tiling helpers should remain separate from the menu-bar indicator. Do not introduce network calls, analytics, automatic SIP changes, or silent configuration replacement.
+Keep the app small and native, with read-only desktop queries and explicit user actions for settings such as hover focus. Changes to the optional tiling helpers should remain separate from the menu-bar indicator. Do not introduce network calls, analytics, automatic SIP changes, or silent configuration replacement.
 
 Before proposing a change:
 

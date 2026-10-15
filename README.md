@@ -16,11 +16,12 @@ A small native macOS menu-bar companion for [yabai](https://github.com/asmvik/ya
 - Every existing Mission Control Space gets a number, including empty desktops.
 - The current Space is filled; inactive ones are dimmed.
 - Click to see apps and window counts grouped by desktop and display.
+- Toggle **Focus on hover: Enabled/Disabled** from the menu; your choice is remembered across restarts.
 - Read-only native fallback when yabai isn't reachable.
 - Optional yabai/skhd configuration: spiral tiling, five memorable shortcuts, and centered floating windows covering approximately **50% of usable screen area**.
 - No network requests, telemetry, window screenshots, or bundled third-party packages.
 
-The menu is informational: it does **not** switch desktops, move windows, or replace yabai. These are real macOS Spaces, not AeroSpace's virtual workspaces.
+The desktop overview uses real macOS Spaces. The hover-focus toggle controls yabai directly; the app does not switch desktops or move windows.
 
 ## Quick start
 
@@ -33,7 +34,7 @@ sh scripts/build.sh
 python3 scripts/install.py
 ```
 
-This installs the menu-bar app for your user and starts it at login. It does **not** change yabai/skhd settings. The build is locally signed, not notarized; build from source rather than treating it as a signed binary distribution. No `sudo` is needed.
+This installs the menu-bar app for your user and starts it at login. Your current hover-focus setting is preserved until you use the toggle. Afterward, the app restores your saved choice when it or yabai restarts. The build is locally signed, not notarized; build from source rather than treating it as a signed binary distribution. No `sudo` is needed.
 
 To also install the included tiling settings and shortcuts, first read [Setup](docs/SETUP.md), then use:
 
